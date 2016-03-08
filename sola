@@ -85,7 +85,8 @@ parser.add_argument(
 parser.add_argument('--content', '-c', help='change content colors', **change_colors_default)
 parser.add_argument('--all', '-A', help='change all colors', **change_colors_default)
 parser.add_argument(
-    '--accent-from-content', '-f', help='blub', default=False, action='store_true')
+    '--accent-from-content', '-f', help='use value passed to --content for --accent',
+    default=False, action='store_true')
 parser.add_argument('--dark', '-d', help='use dark theme', default=False, action='store_true')
 parser.add_argument('--light', '-l', help='use light theme', default=False, action='store_true')
 parser.add_argument('--print-palette', '-p', '-v',action='store_true')
