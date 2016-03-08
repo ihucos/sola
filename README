@@ -1,0 +1,59 @@
+
+usage: sola [-h] [--accent [? [? ...]]] [--background [? [? ...]]]
+            [--content [? [? ...]]] [--all [? [? ...]]]
+            [--accent-from-content] [--dark] [--light] [--print-palette]
+            [--export] [--export-xresources]
+            [--activate-hardcore-hacking-mode] [--version]
+
+Tweak the Solarized colorscheme
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --accent [? [? ...]], -a [? [? ...]]
+                        change accent colors
+  --background [? [? ...]], -b [? [? ...]]
+                        change background colors
+  --content [? [? ...]], -c [? [? ...]]
+                        change content colors
+  --all [? [? ...]], -A [? [? ...]]
+                        change all colors
+  --accent-from-content, -f
+                        blub
+  --dark, -d            use dark theme
+  --light, -l           use light theme
+  --print-palette, -p, -v
+  --export
+  --export-xresources
+  --activate-hardcore-hacking-mode
+                        Activate the hardcore hacking mode (Ahhm)
+  --version             show program's version number and exit
+
+What is this?
+#############
+
+sola is a script to tweak the solarized color theme.
+Changes are done with HSV modifiers on a specific color group.
+
+HSV Modifiers
+#############
+
+HSV Modifiers change the hue, saturation and value of all colors in a given color group.
+Modifications are done in proportion to the corresponding component of the current color.
+Colors are grouped by the collowing color groups: [-b]ackground [-c]ontent and [-a]ccents.
+
+Lets take a closer look at the following HSV Modifier: 0 1 -5
+ - The hue is leaved unchanged
+ - Saturation is decreased by 10% on every color of that color group (multiplicated by 0.9)
+ - The value on every color is increased by 50% of the current value's value
+
+Usage Examples
+##############
+
+# brownish [-b]ackground for the [-d]ark theme
+sola -db -6 5
+
+# increase contrast on the dark theme
+sola -dc 0 0 -2 -a 0 0 -1.5
+
+ # dim [-A]ll colors on the [-l]ight theme
+sola -lA 0 0 4

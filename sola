@@ -1,0 +1,271 @@
+#!/usr/bin/env python
+
+
+from __future__ import print_function
+
+import argparse
+import colorsys
+import struct
+from os import environ
+from sys import argv
+from time import sleep
+
+
+HELP = """
+
+What is this?
+#############
+
+sola is a script to tweak the solarized color theme.
+Changes are done with HSV modifiers on a specific color group.
+
+
+HSV Modifiers
+#############
+
+HSV Modifiers change the hue, saturation and value of all colors in a given color group.
+Modifications are done in proportion to the corresponding component of the current color.
+Colors are grouped by the collowing color groups: [-b]ackground [-c]ontent and [-a]ccents.
+
+Lets take a closer look at the following HSV Modifier: 0 1 -5
+ - The hue is leaved unchanged
+ - Saturation is decreased by 10% on every color of that color group (multiplicated by 0.9)
+ - The value on every color is increased by 50% of the current value's value
+
+
+Usage Examples
+##############
+
+# brownish [-b]ackground for the [-d]ark theme
+sola -db -6 5
+
+# increase contrast on the dark theme
+sola -dc 0 0 -2 -a 0 0 -1.5
+
+ # dim [-A]ll colors on the [-l]ight theme
+sola -lA 0 0 4
+"""
+
+
+__version__ = '0.1 Alpha'
+PROG = 'sola'
+AHHM = " -da 0 0 15 -c -20 300 25 -b -20 -50 -50"
+
+
+def sanitize_hsv_modifiers(args):
+    args = list(args)
+    if len(args) > 3:
+        parser.error('Do not use more than three arguments as HSV modifiers')
+    if not len(args):
+        parser.error('Argument is missing HSV modifiers')
+    if len(args) == 2:
+        return sanitize_hsv_modifiers(args + [0])
+    if len(args) == 1:
+        return sanitize_hsv_modifiers(args + [0, 0])
+
+    hsv_mod = []
+    for num in args:
+        try:
+            hsv_mod.append((-float(num))/10+1)
+        except ValueError:
+            parser.error("invalid number value: {}".format(num))
+    return hsv_mod
+
+
+parser = argparse.ArgumentParser(
+    formatter_class=argparse.RawTextHelpFormatter,
+    description='Tweak the Solarized colorscheme',
+    prog=PROG,
+    epilog=HELP)
+
+change_colors_default = dict(nargs='*', metavar='?', default=[0, 0, 0])
+parser.add_argument('--accent', '-a', help='change accent colors', **change_colors_default)
+parser.add_argument(
+    '--background', '-b', help='change background colors', **change_colors_default)
+parser.add_argument('--content', '-c', help='change content colors', **change_colors_default)
+parser.add_argument('--all', '-A', help='change all colors', **change_colors_default)
+parser.add_argument(
+    '--accent-from-content', '-f', help='blub', default=False, action='store_true')
+parser.add_argument('--dark', '-d', help='use dark theme', default=False, action='store_true')
+parser.add_argument('--light', '-l', help='use light theme', default=False, action='store_true')
+parser.add_argument('--print-palette', '-p', '-v',action='store_true')
+parser.add_argument('--export', action='store_true')
+parser.add_argument('--export-xresources', action='store_true')
+parser.add_argument(
+    '--activate-hardcore-hacking-mode',
+    help='Activate the hardcore hacking mode (Ahhm)',
+    action='store_true')
+parser.add_argument('--version',
+                    action='version',
+                    version='%(prog)s ({})'.format(__version__))
+
+args = parser.parse_args()
+if args.activate_hardcore_hacking_mode:
+    args = parser.parse_args(AHHM.split())
+
+if not args.dark and not args.light:
+    parser.error("Specify --dark or --light")
+if args.dark and args.light:
+    parser.error("The options --dark and --light can't be used at the same time")
+if sum((args.export_xresources, args.export)) > 1:
+    parser.error(
+        "The options --export and --export-xresources can't be used at the same time")
+
+args_all = sanitize_hsv_modifiers(args.all)
+args_content = sanitize_hsv_modifiers(args.content)
+args_background = sanitize_hsv_modifiers(args.background)
+args_accent = sanitize_hsv_modifiers(args.accent)
+args_accent = args_accent if not args.accent_from_content else args_content
+
+
+def patch_hsv(hex, (mod_hue, mod_saturation, mod_value)):
+    r, g, b = struct.unpack('BBB', hex.lstrip('#').decode('hex'))
+    hue, saturation, value = colorsys.rgb_to_hsv(r/255., g/255., b/255.)
+
+    hue += mod_hue
+    saturation *= mod_saturation
+    value *= mod_value
+
+    more_hue, more_saturation, more_value = args_all
+    hue += more_hue
+    saturation *= more_saturation
+    value *= more_value
+
+    r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
+    if not all(0 <= i <= 1 for i in (r, g, b)):
+        print('color overflow: argument numbers out of range')
+        exit(2)
+    return '#%02x%02x%02x' % (r*255, g*255, b*255)
+
+
+if args.dark:
+    base03 = '#002b36'
+    base02 = '#073642'
+    base01 = '#586e75'
+    base00 = '#657b83'
+    base0 = '#839496'
+    base1 = '#93a1a1'
+    base2 = '#eee8d5'
+    base3 = '#fdf6e3'
+
+else:
+    base03 = '#fdf6e3'
+    base02 = '#eee8d5'
+    base01 = '#93a1a1'
+    base00 = '#839496'
+    base0 = '#657b83'
+    base1 = '#586e75'
+    base2 = '#073642'
+    base3 = '#002b36'
+
+base03 = patch_hsv(base03, args_background)
+base02 = patch_hsv(base02, args_background)
+base01 = patch_hsv(base01, args_content)
+base00 = patch_hsv(base00, args_content)
+base0 = patch_hsv(base0, args_content)
+base1 = patch_hsv(base1, args_content)
+base2 = patch_hsv(base2, args_background)
+base3 = patch_hsv(base3, args_background)
+yellow = patch_hsv("#b58900", args_accent)
+orange = patch_hsv("#cb4b16", args_accent)
+red = patch_hsv("#dc322f", args_accent)
+magenta = patch_hsv("#d33682", args_accent)
+violet = patch_hsv("#6c71c4", args_accent)
+blue = patch_hsv("#268bd2", args_accent)
+cyan = patch_hsv("#2aa198", args_accent)
+green = patch_hsv("#859900", args_accent)
+
+
+term_colors = [
+    ('background', base03),
+    ('foreground', base0),
+    ('border', base03 if args.dark else base3),
+    ('color0', base02),
+    ('color1', red),
+    ('color2', green),
+    ('color3', yellow),
+    ('color4', blue),
+    ('color5', magenta),
+    ('color6', cyan),
+    ('color7', base2),
+    ('color9', orange),
+    ('color8', base03),
+    ('color10', base01),
+    ('color11', base00),
+    ('color12', base0),
+    ('color13', violet),
+    ('color14', base1),
+    ('color15', base3)]
+
+
+ESC = "\033"
+BEL = "\007"
+DSC = "{}P".format(ESC)
+OSC = "{}]".format(ESC)
+OSC_MAP = dict(
+    foreground=10,
+    background=11,
+    cursor=12,
+    mouse_foreground=13,
+    mouse_background=14,
+    highlight=17,
+    border=708)
+
+
+def change_color(name, color):
+    if name.startswith('color'):
+        color_index = name[5:]
+        ps = 4
+        pt = "{};{}".format(color_index, color)
+    else:
+        ps = OSC_MAP[name]
+        pt = color
+    command = "{OSC}{ps};{pt}{BEL}".format(ps=ps, pt=pt, BEL=BEL, OSC=OSC)
+    if 'TMUX' in environ:
+        command = "{DSC}tmux;{ESC}{command}{ESC}\\".format(
+            DSC=DSC, ESC=ESC, command=command)
+    print(command, end='')
+
+if args.export:
+
+    export_colors = [
+        ('base03', base03), ('base02', base02), ('base01', base01), ('base00',  base00),
+        ('base0',  base0),  ('base1',  base1),  ('base2',  base2),  ('base3',   base3),
+        ('yellow', yellow), ('orange', orange), ('red',    red),    ('magenta', magenta),
+        ('violet', violet), ('blue',   blue),   ('cyan',   cyan),   ('green',   green)]
+    print('\n'.join('{:<7} {}'.format(k, v) for (k, v) in export_colors))
+
+elif args.export_xresources:
+    print()
+    print('! Generated by: {} {}'.format(PROG, ' '.join(argv[1:])))
+    for name, color in term_colors.items():
+        print("*{}: {}".format(name, color))
+
+else:
+    for name, hex in term_colors:
+        sleep(0.01)
+        change_color(name, hex)
+
+    name_to_term_code = [
+        ('base03', 8), ('base02',  0), ('base01', 10), ('base00', 11), ('base0', 12),
+        ('base1', 14), ('base2',   7), ('base3',  15), ('yellow',  3), ('orange', 9),
+        ('red',    1), ('magenta', 5), ('violet', 13), ('blue',    4), ('cyan',   6),
+        ('green',  2)]
+
+    if args.print_palette:
+        def print_colors(colors):
+            for name, code in colors:
+                print('  \x1b[48;5;{}m{}\x1b[0m'.format(code, ' ' * len(name)), end='')
+            print()
+
+        def print_colornames(colors):
+            for name, _ in colors:
+                print('  \x1b[38;5;{}m{}\x1b[0m'.format(_, name), end='')
+            print()
+
+        print()
+        print_colornames(name_to_term_code[:8])
+        print_colors(name_to_term_code[:8])
+        print()
+        print_colornames(name_to_term_code[8:])
+        print_colors(name_to_term_code[8:])
