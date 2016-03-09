@@ -3,7 +3,7 @@
 
 ### Intro
 [Solarized](http://ethanschoonover.com/solarized) is great and a lot of effort went into making it.
-But at the end of a day, I often wished it had that little bit of more contrast. When working on it in complete darkness even the dark theme is to bright for me. Sometimes I'd just prefer to stare at something that is not blue but brown and a little bit darker. One size does not fit all, this is why you may want to tweak your Solarized.
+But at the end of a day, I often wished it had that little bit of more contrast. When working on it in complete darkness even the dark theme is to bright for me. Sometimes I'd just prefer to stare at something that is not blue but brown and a little bit darker. One size does not fit all, if you want to use a customized version of Solarized, use *sola*
 
 ### Samples
 ![standart solarized light](http://i.imgur.com/cOfDt10.png)
