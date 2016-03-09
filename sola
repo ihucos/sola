@@ -87,8 +87,9 @@ parser.add_argument(
     '--accent-from-content', '-f', help='use value passed to --content for --accent',
     default=False, action='store_true')
 parser.add_argument('--dark', '-d', help='use dark theme', default=False, action='store_true')
-parser.add_argument('--light', '-l', help='use light theme', default=False, action='store_true')
-parser.add_argument('--print-palette', '-p', '-v',action='store_true')
+parser.add_argument('--light', '-l', help='use light theme', default=False,
+                    action='store_true')
+parser.add_argument('--print-palette', '-p', '-v', action='store_true')
 parser.add_argument('--export', action='store_true')
 parser.add_argument('--export-xresources', action='store_true')
 parser.add_argument(
