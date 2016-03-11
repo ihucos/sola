@@ -77,7 +77,14 @@ parser = argparse.ArgumentParser(
     prog=PROG,
     epilog=HELP)
 
-change_colors_default = dict(nargs='*', metavar='?', default=[0, 0, 0])
+change_colors_default = dict(nargs='*', metavar='?', default=[0, 0, 0], type=float)
+parser.add_argument('--light', '-l', help='use light theme', default=False,
+                    action='store_true')
+parser.add_argument('--dark', '-d', help='use dark theme', default=False, action='store_true')
+parser.add_argument('-C', dest='contrast', help='increase Contrast', action='count',
+                    default=0)
+parser.add_argument('-D', dest='darken', help='darken everything', action='count',
+                    default=0)
 parser.add_argument('--accent', '-a', help='change accent colors', **change_colors_default)
 parser.add_argument(
     '--background', '-b', help='change background colors', **change_colors_default)
@@ -86,9 +93,6 @@ parser.add_argument('--all', '-A', help='change all colors', **change_colors_def
 parser.add_argument(
     '--accent-from-content', '-f', help='use value passed to --content for --accent',
     default=False, action='store_true')
-parser.add_argument('--dark', '-d', help='use dark theme', default=False, action='store_true')
-parser.add_argument('--light', '-l', help='use light theme', default=False,
-                    action='store_true')
 parser.add_argument('--print-palette', '-p', '-v', action='store_true')
 parser.add_argument('--export', action='store_true')
 parser.add_argument('--export-xresources', action='store_true')
@@ -112,11 +116,21 @@ if sum((args.export_xresources, args.export)) > 1:
     parser.error(
         "The options --export and --export-xresources can't be used at the same time")
 
-args_all = sanitize_hsv_modifiers(args.all)
-args_content = sanitize_hsv_modifiers(args.content)
-args_background = sanitize_hsv_modifiers(args.background)
-args_accent = sanitize_hsv_modifiers(args.accent)
-args_accent = args_accent if not args.accent_from_content else args_content
+
+hsvmod_all = sanitize_hsv_modifiers(args.all)
+hsvmod_content = sanitize_hsv_modifiers(args.content)
+hsvmod_background = sanitize_hsv_modifiers(args.background)
+hsvmod_accent = sanitize_hsv_modifiers(args.accent)
+if args.accent_from_content:
+    hsvmod_accent = hsvmod_content
+
+
+if args.dark:
+    hsvmod_background[2] += -0.1 * args.contrast
+else:
+    hsvmod_content[2] += -0.1 * args.contrast
+    hsvmod_accent[2] += -0.1 * args.contrast
+hsvmod_all[2] += -0.1 * args.darken
 
 
 def patch_hsv(hex, (mod_hue, mod_saturation, mod_value)):
@@ -127,7 +141,7 @@ def patch_hsv(hex, (mod_hue, mod_saturation, mod_value)):
     saturation *= mod_saturation
     value *= mod_value
 
-    more_hue, more_saturation, more_value = args_all
+    more_hue, more_saturation, more_value = hsvmod_all
     hue += more_hue
     saturation *= more_saturation
     value *= more_value
@@ -159,22 +173,22 @@ else:
     base2 = '#073642'
     base3 = '#002b36'
 
-base03 = patch_hsv(base03, args_background)
-base02 = patch_hsv(base02, args_background)
-base01 = patch_hsv(base01, args_content)
-base00 = patch_hsv(base00, args_content)
-base0 = patch_hsv(base0, args_content)
-base1 = patch_hsv(base1, args_content)
-base2 = patch_hsv(base2, args_background)
-base3 = patch_hsv(base3, args_background)
-yellow = patch_hsv("#b58900", args_accent)
-orange = patch_hsv("#cb4b16", args_accent)
-red = patch_hsv("#dc322f", args_accent)
-magenta = patch_hsv("#d33682", args_accent)
-violet = patch_hsv("#6c71c4", args_accent)
-blue = patch_hsv("#268bd2", args_accent)
-cyan = patch_hsv("#2aa198", args_accent)
-green = patch_hsv("#859900", args_accent)
+base03 = patch_hsv(base03, hsvmod_background)
+base02 = patch_hsv(base02, hsvmod_background)
+base01 = patch_hsv(base01, hsvmod_content)
+base00 = patch_hsv(base00, hsvmod_content)
+base0 = patch_hsv(base0, hsvmod_content)
+base1 = patch_hsv(base1, hsvmod_content)
+base2 = patch_hsv(base2, hsvmod_background)
+base3 = patch_hsv(base3, hsvmod_background)
+yellow = patch_hsv("#b58900", hsvmod_accent)
+orange = patch_hsv("#cb4b16", hsvmod_accent)
+red = patch_hsv("#dc322f", hsvmod_accent)
+magenta = patch_hsv("#d33682", hsvmod_accent)
+violet = patch_hsv("#6c71c4", hsvmod_accent)
+blue = patch_hsv("#268bd2", hsvmod_accent)
+cyan = patch_hsv("#2aa198", hsvmod_accent)
+green = patch_hsv("#859900", hsvmod_accent)
 
 
 term_colors = [
