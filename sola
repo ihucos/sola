@@ -7,7 +7,6 @@ import colorsys
 import struct
 from os import environ
 from sys import argv
-from time import sleep
 
 
 HELP = """
@@ -227,7 +226,7 @@ OSC_MAP = dict(
     border=708)
 
 
-def change_color(name, color):
+def get_change_color(name, color):
     if name.startswith('color'):
         color_index = name[5:]
         ps = 4
@@ -239,7 +238,7 @@ def change_color(name, color):
     if 'TMUX' in environ:
         command = "{DSC}tmux;{ESC}{command}{ESC}\\".format(
             DSC=DSC, ESC=ESC, command=command)
-    print(command, end='')
+    return command
 
 if args.export:
 
@@ -257,9 +256,11 @@ elif args.export_xresources:
         print("*{}: {}".format(name, color))
 
 else:
+    stri = []
     for name, hex in term_colors:
-        sleep(0.01)
-        change_color(name, hex)
+        cmd = get_change_color(name, hex)
+        stri.append(cmd)
+    print(''.join(stri), end='')
 
     name_to_term_code = [
         ('base03', 8), ('base02',  0), ('base01', 10), ('base00', 11), ('base0', 12),
