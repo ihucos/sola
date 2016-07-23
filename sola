@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import argparse
 import colorsys
+import platform
 import struct
 from os import environ
 from sys import argv
@@ -234,19 +235,39 @@ OSC_MAP = dict(
     highlight=17,
     border=708)
 
-
 def get_change_color(name, color, tmux):
-    if name.startswith('color'):
-        color_index = name[5:]
-        ps = 4
-        pt = "{};{}".format(color_index, color)
+
+    if not platform.system() == 'Darwin':
+
+        # standart (urxvt, xterm)
+        if name.startswith('color'):
+            color_index = name[5:]
+            ps = 4
+            pt = "{};{}".format(color_index, color)
+        else:
+            ps = OSC_MAP[name]
+            pt = color
+        command = "{OSC}{ps};{pt}{BEL}".format(ps=ps, pt=pt, BEL=BEL, OSC=OSC)
+
     else:
-        ps = OSC_MAP[name]
-        pt = color
-    command = "{OSC}{ps};{pt}{BEL}".format(ps=ps, pt=pt, BEL=BEL, OSC=OSC)
+
+        # iterm2 - https://www.iterm2.com/documentation-escape-codes.html
+        if name == 'foreground':
+            mod = 'g'
+        elif name == 'background':
+            mod = 'h'
+        elif name.startswith('color'):
+            mod = name[5:]
+        else:
+            mod = None
+        command = "{OSC}P{mod}{color}{ESC}\\".format(
+            OSC=OSC, color=color[1:], mod=mod, ESC=ESC
+            ) if mod else ''
+
     if tmux:
         command = "{DSC}tmux;{ESC}{command}{ESC}\\".format(
             DSC=DSC, ESC=ESC, command=command)
+
     return command
 
 if args.export:
