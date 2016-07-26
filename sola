@@ -257,7 +257,8 @@ def get_change_color(name, color, tmux):
         elif name == 'background':
             mod = 'h'
         elif name.startswith('color'):
-            mod = name[5:]
+            color_num = int(name[5:])
+            mod = hex(color_num)[2:]
         else:
             mod = None
         command = "{OSC}P{mod}{color}{ESC}\\".format(
