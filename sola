@@ -93,6 +93,8 @@ parser.add_argument('-C', dest='contrast', help='increase Contrast', action='cou
                     default=0)
 parser.add_argument('-D', dest='darken', help='darken everything', action='count',
                     default=0)
+parser.add_argument(
+    '--interactive', '-i', help='change colors in realtime', dest='interactive', default=False, action='store_true')
 parser.add_argument('--accent', '-a', help='change accent colors', **change_colors_default)
 parser.add_argument(
     '--background', '-b', help='change background colors', **change_colors_default)
@@ -114,14 +116,56 @@ parser.add_argument('--version',
                     version='%(prog)s ({})'.format(__version__))
 
 args = parser.parse_args()
-if args.activate_hardcore_hacking_mode:
+
+if args.interactive:
+    import os
+    import subprocess
+    import sys
+    import termios
+    import tty
+
+    QUIT = [chr(27), 'q']
+    FNULL = open(os.devnull, 'w')
+    orig_settings = termios.tcgetattr(sys.stdin)
+    gui_state = {'contrast': 0, 'brightness': 0, 'theme': 'dark'}
+    tty.setraw(sys.stdin)
+    char = 0
+    while True:
+        # gui_state_backup = gui_state.copy()
+
+        cs = 'C' * gui_state['contrast']
+        ds ='D' * gui_state['brightness']
+        theme = gui_state['theme']
+        exit = subprocess.Popen(
+            [argv[0], '-' + theme[0] + cs + ds],
+            stderr=FNULL
+        )#.wait()
+        # if exit:
+        #     gui_state = gui_state_backup
+
+        char = sys.stdin.read(1)[0]
+        if char in QUIT: break
+        elif char == 'j': gui_state['brightness'] -= 1
+        elif char == 'k': gui_state['brightness'] += 1
+        elif char == 'h': gui_state['contrast'] -= 1
+        elif char == 'l': gui_state['contrast'] += 1
+        elif char == 't': gui_state['theme'] = {'dark': 'light'}.get(gui_state['theme'], 'dark')
+        elif char == 'r': gui_state = {'contrast': 0, 'brightness': 0, 'theme': gui_state['theme']}
+
+    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, orig_settings)     
+    sys.exit(0)
+
+
+
+
+elif args.activate_hardcore_hacking_mode:
     args = parser.parse_args(AHHM.split())
 
-if not args.dark and not args.light:
+elif not args.dark and not args.light:
     parser.error("Specify --dark or --light")
-if args.dark and args.light:
+elif args.dark and args.light:
     parser.error("The options --dark and --light can't be used at the same time")
-if sum((args.export_xresources, args.export)) > 1:
+elif sum((args.export_xresources, args.export)) > 1:
     parser.error(
         "The options --export and --export-xresources can't be used at the same time")
 
