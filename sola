@@ -6,9 +6,8 @@ import argparse
 import colorsys
 import platform
 import struct
+import sys
 from os import environ
-from sys import argv
-
 
 HELP = """
 
@@ -57,6 +56,39 @@ fi'''
 __version__ = '0.1 Alpha'
 PROG = 'sola'
 AHHM = " -da 0 5 1 -b 0 7 6 -c 7.1 51 3"
+ESC = "\033"
+BEL = "\007"
+DSC = "{}P".format(ESC)
+OSC = "{}]".format(ESC)
+OSC_MAP = dict(
+    foreground=10,
+    background=11,
+    cursor=12,
+    mouse_foreground=13,
+    mouse_background=14,
+    highlight=17,
+    border=708)
+
+
+
+def patch_hsv(hex, (mod_hue, mod_saturation, mod_value)):
+    r, g, b = struct.unpack('BBB', hex.lstrip('#').decode('hex'))
+    hue, saturation, value = colorsys.rgb_to_hsv(r/255., g/255., b/255.)
+
+    hue += mod_hue
+    saturation *= mod_saturation
+    value *= mod_value
+
+#     more_hue, more_saturation, more_value = hsvmod_all
+#     hue += more_hue
+#     saturation *= more_saturation
+#     value *= more_value
+
+    r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
+    if not all(0 <= i <= 1 for i in (r, g, b)):
+        print('color overflow: argument numbers out of range')
+        exit(2)
+    return '#%02x%02x%02x' % (r*255, g*255, b*255)
 
 
 def sanitize_hsv_modifiers(args):
@@ -79,207 +111,7 @@ def sanitize_hsv_modifiers(args):
     return hsv_mod
 
 
-parser = argparse.ArgumentParser(
-    formatter_class=argparse.RawTextHelpFormatter,
-    description='Tweak the Solarized colorscheme',
-    prog=PROG,
-    epilog=HELP)
-
-change_colors_default = dict(nargs='*', metavar='?', default=[0, 0, 0], type=float)
-parser.add_argument('--light', '-l', help='use light theme', default=False,
-                    action='store_true')
-parser.add_argument('--dark', '-d', help='use dark theme', default=False, action='store_true')
-parser.add_argument('-C', dest='contrast', help='increase Contrast', action='count',
-                    default=0)
-parser.add_argument('-D', dest='darken', help='darken everything', action='count',
-                    default=0)
-parser.add_argument(
-    '--interactive', '-i', help='change colors in realtime', dest='interactive', default=False, action='store_true')
-parser.add_argument('--accent', '-a', help='change accent colors', **change_colors_default)
-parser.add_argument(
-    '--background', '-b', help='change background colors', **change_colors_default)
-parser.add_argument('--content', '-c', help='change content colors', **change_colors_default)
-parser.add_argument('--all', '-A', help='change all colors', **change_colors_default)
-parser.add_argument(
-    '--accent-from-content', '-f', help='use value passed to --content for --accent',
-    default=False, action='store_true')
-parser.add_argument('--print-palette', '-p', '-v', action='store_true')
-parser.add_argument('--export', action='store_true')
-parser.add_argument('--export-xresources', action='store_true')
-parser.add_argument('--export-bash', action='store_true')
-parser.add_argument(
-    '--activate-hardcore-hacking-mode',
-    help='Activate the hardcore hacking mode (Ahhm)',
-    action='store_true')
-parser.add_argument('--version',
-                    action='version',
-                    version='%(prog)s ({})'.format(__version__))
-
-args = parser.parse_args()
-
-if args.interactive:
-    import os
-    import subprocess
-    import sys
-    import termios
-    import tty
-
-    QUIT = [chr(27), 'q']
-    FNULL = open(os.devnull, 'w')
-    orig_settings = termios.tcgetattr(sys.stdin)
-    gui_state = {'contrast': 0, 'brightness': 0, 'theme': 'dark'}
-    tty.setraw(sys.stdin)
-    char = 0
-    while True:
-        # gui_state_backup = gui_state.copy()
-
-        cs = 'C' * gui_state['contrast']
-        ds ='D' * gui_state['brightness']
-        theme = gui_state['theme']
-        exit = subprocess.Popen(
-            [argv[0], '-' + theme[0] + cs + ds],
-            stderr=FNULL
-        )#.wait()
-        # if exit:
-        #     gui_state = gui_state_backup
-
-        char = sys.stdin.read(1)[0]
-        if char in QUIT: break
-        elif char == 'j': gui_state['brightness'] -= 1
-        elif char == 'k': gui_state['brightness'] += 1
-        elif char == 'h': gui_state['contrast'] -= 1
-        elif char == 'l': gui_state['contrast'] += 1
-        elif char == 't': gui_state['theme'] = {'dark': 'light'}.get(gui_state['theme'], 'dark')
-        elif char == 'r': gui_state = {'contrast': 0, 'brightness': 0, 'theme': gui_state['theme']}
-
-    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, orig_settings)     
-    sys.exit(0)
-
-
-
-
-elif args.activate_hardcore_hacking_mode:
-    args = parser.parse_args(AHHM.split())
-
-elif not args.dark and not args.light:
-    parser.error("Specify --dark or --light")
-elif args.dark and args.light:
-    parser.error("The options --dark and --light can't be used at the same time")
-elif sum((args.export_xresources, args.export)) > 1:
-    parser.error(
-        "The options --export and --export-xresources can't be used at the same time")
-
-
-hsvmod_all = sanitize_hsv_modifiers(args.all)
-hsvmod_content = sanitize_hsv_modifiers(args.content)
-hsvmod_background = sanitize_hsv_modifiers(args.background)
-hsvmod_accent = sanitize_hsv_modifiers(args.accent)
-if args.accent_from_content:
-    hsvmod_accent = hsvmod_content
-
-
-if args.dark:
-    hsvmod_background[2] += -0.1 * args.contrast
-else:
-    hsvmod_content[2] += -0.1 * args.contrast
-    hsvmod_accent[2] += -0.1 * args.contrast
-hsvmod_all[2] += -0.1 * args.darken
-
-
-def patch_hsv(hex, (mod_hue, mod_saturation, mod_value)):
-    r, g, b = struct.unpack('BBB', hex.lstrip('#').decode('hex'))
-    hue, saturation, value = colorsys.rgb_to_hsv(r/255., g/255., b/255.)
-
-    hue += mod_hue
-    saturation *= mod_saturation
-    value *= mod_value
-
-    more_hue, more_saturation, more_value = hsvmod_all
-    hue += more_hue
-    saturation *= more_saturation
-    value *= more_value
-
-    r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
-    if not all(0 <= i <= 1 for i in (r, g, b)):
-        print('color overflow: argument numbers out of range')
-        exit(2)
-    return '#%02x%02x%02x' % (r*255, g*255, b*255)
-
-
-if args.dark:
-    base03 = '#002b36'
-    base02 = '#073642'
-    base01 = '#586e75'
-    base00 = '#657b83'
-    base0 = '#839496'
-    base1 = '#93a1a1'
-    base2 = '#eee8d5'
-    base3 = '#fdf6e3'
-
-else:
-    base03 = '#fdf6e3'
-    base02 = '#eee8d5'
-    base01 = '#93a1a1'
-    base00 = '#839496'
-    base0 = '#657b83'
-    base1 = '#586e75'
-    base2 = '#073642'
-    base3 = '#002b36'
-
-base03 = patch_hsv(base03, hsvmod_background)
-base02 = patch_hsv(base02, hsvmod_background)
-base01 = patch_hsv(base01, hsvmod_content)
-base00 = patch_hsv(base00, hsvmod_content)
-base0 = patch_hsv(base0, hsvmod_content)
-base1 = patch_hsv(base1, hsvmod_content)
-base2 = patch_hsv(base2, hsvmod_background)
-base3 = patch_hsv(base3, hsvmod_background)
-yellow = patch_hsv("#b58900", hsvmod_accent)
-orange = patch_hsv("#cb4b16", hsvmod_accent)
-red = patch_hsv("#dc322f", hsvmod_accent)
-magenta = patch_hsv("#d33682", hsvmod_accent)
-violet = patch_hsv("#6c71c4", hsvmod_accent)
-blue = patch_hsv("#268bd2", hsvmod_accent)
-cyan = patch_hsv("#2aa198", hsvmod_accent)
-green = patch_hsv("#859900", hsvmod_accent)
-
-
-term_colors = [
-    ('background', base03),
-    ('foreground', base0),
-    ('border', base03 if args.dark else base3),
-    ('color0', base02),
-    ('color1', red),
-    ('color2', green),
-    ('color3', yellow),
-    ('color4', blue),
-    ('color5', magenta),
-    ('color6', cyan),
-    ('color7', base2),
-    ('color9', orange),
-    ('color8', base03),
-    ('color10', base01),
-    ('color11', base00),
-    ('color12', base0),
-    ('color13', violet),
-    ('color14', base1),
-    ('color15', base3)]
-
-
-ESC = "\033"
-BEL = "\007"
-DSC = "{}P".format(ESC)
-OSC = "{}]".format(ESC)
-OSC_MAP = dict(
-    foreground=10,
-    background=11,
-    cursor=12,
-    mouse_foreground=13,
-    mouse_background=14,
-    highlight=17,
-    border=708)
-
-def get_change_color(name, color, tmux):
+def get_change_color(name, color, in_tmux=False):
 
     if not platform.system() == 'Darwin':
 
@@ -309,61 +141,228 @@ def get_change_color(name, color, tmux):
             OSC=OSC, color=color[1:], mod=mod, ESC=ESC
             ) if mod else ''
 
-    if tmux:
+    if in_tmux:
         command = "{DSC}tmux;{ESC}{command}{ESC}\\".format(
             DSC=DSC, ESC=ESC, command=command)
 
     return command
 
-if args.export:
 
-    export_colors = [
-        ('base03', base03), ('base02', base02), ('base01', base01), ('base00',  base00),
-        ('base0',  base0),  ('base1',  base1),  ('base2',  base2),  ('base3',   base3),
-        ('yellow', yellow), ('orange', orange), ('red',    red),    ('magenta', magenta),
-        ('violet', violet), ('blue',   blue),   ('cyan',   cyan),   ('green',   green)]
-    print('\n'.join('{:<7} {}'.format(k, v) for (k, v) in export_colors))
+def main(argv=sys.argv):
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter,
+        description='Tweak the Solarized colorscheme',
+        prog=PROG,
+        epilog=HELP)
 
-elif args.export_xresources:
-    print()
-    print('! Generated by: {} {}'.format(PROG, ' '.join(argv[1:])))
-    for name, color in term_colors:
-        print("*{}: {}".format(name, color))
+    change_colors_default = dict(nargs='*', metavar='?', default=[0, 0, 0], type=float)
+    parser.add_argument('--light', '-l', help='use light theme', default=False,
+                        action='store_true')
+    parser.add_argument('--dark', '-d', help='use dark theme', default=False, action='store_true')
+    parser.add_argument('-C', dest='contrast', help='increase Contrast', action='count',
+                        default=0)
+    parser.add_argument('-D', dest='darken', help='darken everything', action='count',
+                        default=0)
+    parser.add_argument(
+        '--interactive', '-i', help='change colors in realtime', dest='interactive', default=False, action='store_true')
+    parser.add_argument('--accent', '-a', help='change accent colors', **change_colors_default)
+    parser.add_argument(
+        '--background', '-b', help='change background colors', **change_colors_default)
+    parser.add_argument('--content', '-c', help='change content colors', **change_colors_default)
+    parser.add_argument('--all', '-A', help='change all colors', **change_colors_default)
+    parser.add_argument(
+        '--accent-from-content', '-f', help='use value passed to --content for --accent',
+        default=False, action='store_true')
+    parser.add_argument('--print-palette', '-p', '-v', action='store_true')
+    parser.add_argument('--export', action='store_true')
+    parser.add_argument('--export-xresources', action='store_true')
+    parser.add_argument('--export-bash', action='store_true')
+    parser.add_argument(
+        '--activate-hardcore-hacking-mode',
+        help='Activate the hardcore hacking mode (Ahhm)',
+        action='store_true')
+    parser.add_argument('--version',
+                        action='version',
+                        version='%(prog)s ({})'.format(__version__))
 
-elif args.export_bash:
-    str_notmux = ''.join(get_change_color(name, hex, tmux=False) for name, hex in term_colors)
-    str_tmux = ''.join(get_change_color(name, hex, tmux=True) for name, hex in term_colors)
-    print(BASH_TEMPL.format(
-        tmux=repr(str_tmux),
-        notmux=repr(str_notmux),
-        stamp=' '.join(argv[1:])))
-else:
-    if 'TMUX' in environ:
-        print(''.join(get_change_color(name, hex, tmux=True) for name, hex in term_colors), end='')
+    args = parser.parse_args(argv[1:])
+
+    if args.interactive:
+        import os
+        import subprocess
+        import termios
+        import tty
+
+        QUIT = [chr(27), 'q']
+        FNULL = open(os.devnull, 'w')
+        orig_settings = termios.tcgetattr(sys.stdin)
+        gui_state = {'contrast': 0, 'brightness': 0, 'theme': 'dark'}
+        tty.setraw(sys.stdin)
+        char = 0
+        while True:
+            # gui_state_backup = gui_state.copy()
+
+            cs = 'C' * gui_state['contrast']
+            ds ='D' * gui_state['brightness']
+            theme = gui_state['theme']
+            main([argv[0], '-' + theme[0] + cs + ds])
+
+            char = sys.stdin.read(1)[0]
+            if char in QUIT: break
+            elif char == 'j': gui_state['brightness'] -= 1
+            elif char == 'k': gui_state['brightness'] += 1
+            elif char == 'h': gui_state['contrast'] -= 1
+            elif char == 'l': gui_state['contrast'] += 1
+            elif char == 't': gui_state['theme'] = {'dark': 'light'}.get(gui_state['theme'], 'dark')
+            elif char == 'r': gui_state = {'contrast': 0, 'brightness': 0, 'theme': gui_state['theme']}
+
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, orig_settings)     
+        sys.exit(0)
+
+
+
+
+    elif args.activate_hardcore_hacking_mode:
+        args = parser.parse_args(AHHM.split())
+
+    elif not args.dark and not args.light:
+        parser.error("Specify --dark or --light")
+    elif args.dark and args.light:
+        parser.error("The options --dark and --light can't be used at the same time")
+    elif sum((args.export_xresources, args.export)) > 1:
+        parser.error(
+            "The options --export and --export-xresources can't be used at the same time")
+
+
+    # hsvmod_all = sanitize_hsv_modifiers(args.all)
+    hsvmod_content = sanitize_hsv_modifiers(args.content)
+    hsvmod_background = sanitize_hsv_modifiers(args.background)
+    hsvmod_accent = sanitize_hsv_modifiers(args.accent)
+    if args.accent_from_content:
+        hsvmod_accent = hsvmod_content
+
+
+    if args.dark:
+        hsvmod_background[2] += -0.1 * args.contrast
     else:
-        print(''.join(get_change_color(name, hex, tmux=False) for name, hex in term_colors), end='')
+        hsvmod_content[2] += -0.1 * args.contrast
+        hsvmod_accent[2] += -0.1 * args.contrast
+    # hsvmod_all[2] += -0.1 * args.darken
 
-    if args.print_palette:
 
-        def print_colors(colors):
-            for name, code in colors:
-                print('  \x1b[48;5;{}m{}\x1b[0m'.format(code, ' ' * len(name)), end='')
-            print()
+    if args.dark:
+        base03 = '#002b36'
+        base02 = '#073642'
+        base01 = '#586e75'
+        base00 = '#657b83'
+        base0 = '#839496'
+        base1 = '#93a1a1'
+        base2 = '#eee8d5'
+        base3 = '#fdf6e3'
 
-        def print_colornames(colors):
-            for name, _ in colors:
-                print('  \x1b[38;5;{}m{}\x1b[0m'.format(_, name), end='')
-            print()
+    else:
+        base03 = '#fdf6e3'
+        base02 = '#eee8d5'
+        base01 = '#93a1a1'
+        base00 = '#839496'
+        base0 = '#657b83'
+        base1 = '#586e75'
+        base2 = '#073642'
+        base3 = '#002b36'
 
-        name_to_term_code = [
-            ('base03', 8), ('base02',  0), ('base01', 10), ('base00', 11), ('base0', 12),
-            ('base1', 14), ('base2',   7), ('base3',  15), ('yellow',  3), ('orange', 9),
-            ('red',    1), ('magenta', 5), ('violet', 13), ('blue',    4), ('cyan',   6),
-            ('green',  2)]
+    base03 = patch_hsv(base03, hsvmod_background)
+    base02 = patch_hsv(base02, hsvmod_background)
+    base01 = patch_hsv(base01, hsvmod_content)
+    base00 = patch_hsv(base00, hsvmod_content)
+    base0 = patch_hsv(base0, hsvmod_content)
+    base1 = patch_hsv(base1, hsvmod_content)
+    base2 = patch_hsv(base2, hsvmod_background)
+    base3 = patch_hsv(base3, hsvmod_background)
+    yellow = patch_hsv("#b58900", hsvmod_accent)
+    orange = patch_hsv("#cb4b16", hsvmod_accent)
+    red = patch_hsv("#dc322f", hsvmod_accent)
+    magenta = patch_hsv("#d33682", hsvmod_accent)
+    violet = patch_hsv("#6c71c4", hsvmod_accent)
+    blue = patch_hsv("#268bd2", hsvmod_accent)
+    cyan = patch_hsv("#2aa198", hsvmod_accent)
+    green = patch_hsv("#859900", hsvmod_accent)
 
+
+    term_colors = [
+        ('background', base03),
+        ('foreground', base0),
+        ('border', base03 if args.dark else base3),
+        ('color0', base02),
+        ('color1', red),
+        ('color2', green),
+        ('color3', yellow),
+        ('color4', blue),
+        ('color5', magenta),
+        ('color6', cyan),
+        ('color7', base2),
+        ('color9', orange),
+        ('color8', base03),
+        ('color10', base01),
+        ('color11', base00),
+        ('color12', base0),
+        ('color13', violet),
+        ('color14', base1),
+        ('color15', base3)]
+
+
+    if args.export:
+
+        export_colors = [
+            ('base03', base03), ('base02', base02), ('base01', base01), ('base00',  base00),
+            ('base0',  base0),  ('base1',  base1),  ('base2',  base2),  ('base3',   base3),
+            ('yellow', yellow), ('orange', orange), ('red',    red),    ('magenta', magenta),
+            ('violet', violet), ('blue',   blue),   ('cyan',   cyan),   ('green',   green)]
+        print('\n'.join('{:<7} {}'.format(k, v) for (k, v) in export_colors))
+
+    elif args.export_xresources:
         print()
-        print_colornames(name_to_term_code[:8])
-        print_colors(name_to_term_code[:8])
-        print()
-        print_colornames(name_to_term_code[8:])
-        print_colors(name_to_term_code[8:])
+        print('! Generated by: {} {}'.format(PROG, ' '.join(argv[1:])))
+        for name, color in term_colors:
+            print("*{}: {}".format(name, color))
+
+    elif args.export_bash:
+        str_notmux = ''.join(get_change_color(name, hex, in_tmux=False) for name, hex in term_colors)
+        str_tmux = ''.join(get_change_color(name, hex, in_tmux=True) for name, hex in term_colors)
+        print(BASH_TEMPL.format(
+            tmux=repr(str_tmux),
+            notmux=repr(str_notmux),
+            stamp=' '.join(argv[1:])))
+    else:
+        if 'TMUX' in environ:
+            print(''.join(get_change_color(name, hex, in_tmux=True) for name, hex in term_colors), end='')
+        else:
+            print(''.join(get_change_color(name, hex, in_tmux=False) for name, hex in term_colors), end='')
+
+        if args.print_palette:
+
+            def print_colors(colors):
+                for name, code in colors:
+                    print('  \x1b[48;5;{}m{}\x1b[0m'.format(code, ' ' * len(name)), end='')
+                print()
+
+            def print_colornames(colors):
+                for name, _ in colors:
+                    print('  \x1b[38;5;{}m{}\x1b[0m'.format(_, name), end='')
+                print()
+
+            name_to_term_code = [
+                ('base03', 8), ('base02',  0), ('base01', 10), ('base00', 11), ('base0', 12),
+                ('base1', 14), ('base2',   7), ('base3',  15), ('yellow',  3), ('orange', 9),
+                ('red',    1), ('magenta', 5), ('violet', 13), ('blue',    4), ('cyan',   6),
+                ('green',  2)]
+
+            print()
+            print_colornames(name_to_term_code[:8])
+            print_colors(name_to_term_code[:8])
+            print()
+            print_colornames(name_to_term_code[8:])
+            print_colors(name_to_term_code[8:])
+
+
+if __name__ == "__main__":
+    main()
