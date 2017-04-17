@@ -4,10 +4,12 @@ from __future__ import print_function
 
 import argparse
 import colorsys
+import os
 import platform
 import struct
 import sys
-from os import environ
+import termios
+import tty
 
 HELP = """
 
@@ -165,69 +167,56 @@ def main(argv=sys.argv):
     args = parser.parse_args(argv[1:])
 
     if args.interactive:
-        import os
-        import subprocess
-        import termios
-        import tty
-
         QUIT = [chr(27), 'q']
-        FNULL = open(os.devnull, 'w')
         orig_settings = termios.tcgetattr(sys.stdin)
         state = {'contrast': 0, 'brightness': 0, 'theme': 'dark', 'background': 0}
         state_history = []
         print('[bB]ackgroud [cC]ontrast [dD]arken [r]eset [t]heme [u]ndo')
 
         tty.setraw(sys.stdin)
-        try:
-            char = 0
-            while True:
+        while True:
 
-                state_backup = state.copy()
-                char = sys.stdin.read(1)[0]
-                if char in QUIT:
-                    break
-                elif char == 'D':
-                    state['brightness'] = max(state['brightness'] - 1, 0)
-                elif char == 'd':
-                    state['brightness'] =  max(state['brightness'] + 1, 0)
-                elif char == 'C':
-                    state['contrast'] = max(state['contrast'] - 1, 0)
-                elif char == 'c':
-                    state['contrast'] = max(state['contrast'] + 1, 0)
-                elif char == 't':
-                    state['theme'] = {'dark': 'light'}.get(state['theme'], 'dark')
-                elif char == 'b':
-                    state['background'] = (state['background'] + 0.1) % 10
-                elif char == 'B':
-                    state['background'] = (state['background'] - 0.1) % 10
-                elif char == 'u':
-                    if state_history:
-                        state = state_history.pop()
-                elif char == 'r':
-                    state = {'contrast': 0, 'brightness': 0, 'theme': state['theme'], 'background': 0}
+            state_backup = state.copy()
+            char = sys.stdin.read(1)[0]
+            if char in QUIT:
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, orig_settings)     
+                print()
+                sys.exit(0)
+            elif char == 'D':
+                state['brightness'] = max(state['brightness'] - 1, 0)
+            elif char == 'd':
+                state['brightness'] =  max(state['brightness'] + 1, 0)
+            elif char == 'C':
+                state['contrast'] = max(state['contrast'] - 1, 0)
+            elif char == 'c':
+                state['contrast'] = max(state['contrast'] + 1, 0)
+            elif char == 't':
+                state['theme'] = {'dark': 'light'}.get(state['theme'], 'dark')
+            elif char == 'b':
+                state['background'] = round((state['background'] + 0.1) % 10, 1)
+            elif char == 'B':
+                state['background'] = round((state['background'] - 0.1) % 10, 1)
+            elif char == 'u':
+                if state_history:
+                    state = state_history.pop()
+            elif char == 'r':
+                state = {'contrast': 0, 'brightness': 0, 'theme': state['theme'], 'background': 0}
 
-                sola_args = '-{}{}{}b {}'.format(
-                    state['theme'][0],
-                    'C' * state['contrast'],
-                    'D' * state['brightness'],
-                    state['background'])
-                try:
-                    main([argv[0], sola_args])
-                except ColorOverflow:
-                    state = state_backup
-                    continue
-                if char != 'u':
-                    if len(state_history) < 10000:
-                        state_history.append(state.copy())
-                print('\33[2K\rsola ' + sola_args, end='')
+            sola_args = '-{}{}{}b {}'.format(
+                state['theme'][0],
+                'C' * state['contrast'],
+                'D' * state['brightness'],
+                state['background'])
+            try:
+                main([argv[0], sola_args])
+            except ColorOverflow:
+                state = state_backup
+                continue
+            if char != 'u':
+                if len(state_history) < 10000:
+                    state_history.append(state.copy())
 
-
-        except:
-            raise
-        finally:
-            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, orig_settings)     
-        sys.exit(0)
-
+            print('\33[2K\rsola ' + sola_args, end='')
 
 
 
@@ -377,7 +366,7 @@ def main(argv=sys.argv):
             notmux=repr(str_notmux),
             stamp=' '.join(argv[1:])))
     else:
-        if 'TMUX' in environ:
+        if 'TMUX' in os.environ:
             print(''.join(get_change_color(name, hex, in_tmux=True) for name, hex in term_colors), end='')
         else:
             print(''.join(get_change_color(name, hex, in_tmux=False) for name, hex in term_colors), end='')
