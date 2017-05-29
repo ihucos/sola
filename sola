@@ -111,6 +111,8 @@ def get_change_color(name, color, in_tmux=False):
             mod = 'g'
         elif name == 'background':
             mod = 'h'
+        elif name == 'cursor':
+            mod = 'l'
         elif name.startswith('color'):
             color_num = int(name[5:])
             mod = hex(color_num)[2:]
@@ -322,6 +324,7 @@ def main(argv=sys.argv):
 
 
     term_colors = [
+        ('cursor', red),
         ('background', base03),
         ('foreground', base0),
         ('border', base03 if args.dark else base3),
