@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
-
 import argparse
 import colorsys
 import os
@@ -76,8 +74,10 @@ class ColorOverflow(SystemExit):
     pass
 
 
-def patch_hsv(hex, (mod_hue, mod_saturation, mod_value)):
-    r, g, b = struct.unpack('BBB', hex.lstrip('#').decode('hex'))
+def patch_hsv(hex, mod):
+    mod_hue, mod_saturation, mod_value = mod
+    decodex_hex = bytes.fromhex(hex.lstrip('#'))
+    r, g, b = struct.unpack('BBB', decodex_hex)
     hue, saturation, value = colorsys.rgb_to_hsv(r/255., g/255., b/255.)
 
     hue += mod_hue
@@ -87,7 +87,7 @@ def patch_hsv(hex, (mod_hue, mod_saturation, mod_value)):
     r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
     if not all(0 <= i <= 1 for i in (r, g, b)):
         raise ColorOverflow('Color Overflow: Argument numbers out of range')
-    return '#%02x%02x%02x' % (r*255, g*255, b*255)
+    return '#%02x%02x%02x' % (int(r*255), int(g*255), int(b*255))
 
 
 def get_change_color(name, color, in_tmux=False):
