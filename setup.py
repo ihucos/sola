@@ -6,5 +6,5 @@ setup(
     description='Customize the solarized theme for your terminal',
     url='https://github.com/ihucos/sola',
     scripts=['sola'],
-    zip_safe=True,
+    python_requires='>=3',
 )
